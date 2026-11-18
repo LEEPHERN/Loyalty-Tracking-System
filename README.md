@@ -1,2 +1,2 @@
-# Customer-Loyalty-Tracking-System
+# Loyalty-Tracking-System
 For Coffee Lover Loyalty Tracking
