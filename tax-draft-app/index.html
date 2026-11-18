@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaxDraft MY — Malaysian Corporate Tax Drafting Assistant</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    --primary: #1a4d8f; --primary-dark: #0d3261; --accent: #0e7c5a;
+    --danger: #c0392b; --warn: #d68910; --bg: #f4f6f9; --card: #ffffff;
+    --text: #2c3e50; --muted: #7f8c8d; --border: #d5dbe3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+  header { background: var(--primary); color: #fff; padding: 14px 28px; display: flex; align-items: center; gap: 14px; }
+  header h1 { font-size: 19px; font-weight: 600; }
+  header .sub { font-size: 12px; opacity: .85; }
+  header .spacer { flex: 1; }
+  nav.tabs { display: flex; background: var(--primary-dark); padding: 0 28px; }
+  nav.tabs button { background: none; border: none; color: #bcd0e8; padding: 11px 20px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; }
+  nav.tabs button.active { color: #fff; border-bottom-color: #fff; font-weight: 600; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 28px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  .card h2 { font-size: 16px; color: var(--primary-dark); margin-bottom: 12px; }
+  .card h3 { font-size: 14px; color: var(--primary-dark); margin: 14px 0 8px; }
+  label.field { display: block; margin-bottom: 10px; }
+  label.field span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=password], select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; font-family: inherit; }
+  textarea { resize: vertical; }
+  button.btn { background: var(--primary); color: #fff; border: none; padding: 9px 18px; border-radius: 5px; font-size: 13px; cursor: pointer; font-weight: 600; }
+  button.btn:hover { background: var(--primary-dark); }
+  button.btn.secondary { background: #5d6d7e; }
+  button.btn.accent { background: var(--accent); }
+  button.btn:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 200px; }
+  .dropzone { border: 2px dashed var(--border); border-radius: 8px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s; margin-bottom: 8px; }
+  .dropzone:hover, .dropzone.drag { border-color: var(--primary); background: #eef4fb; }
+  .filelist { list-style: none; margin-top: 8px; }
+  .filelist li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #eef4fb; border-radius: 5px; margin-bottom: 5px; font-size: 13px; }
+  .filelist li .tag { background: var(--primary); color: #fff; border-radius: 3px; padding: 1px 7px; font-size: 11px; }
+  .filelist li .tag.pdf { background: var(--danger); }
+  .filelist li .tag.xlsx { background: var(--accent); }
+  .filelist li .remove { margin-left: auto; color: var(--danger); cursor: pointer; font-weight: bold; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.data th { background: var(--primary-dark); color: #fff; padding: 7px 10px; text-align: left; position: sticky; top: 0; }
+  table.data td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  table.data td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scrollbox { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+  .badge { display: inline-block; border-radius: 10px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .badge.red { background: #fdecea; color: var(--danger); }
+  .badge.orange { background: #fef5e7; color: var(--warn); }
+  .badge.green { background: #e8f8f0; color: var(--accent); }
+  .badge.grey { background: #eaecee; color: var(--muted); }
+  .spinner { width: 18px; height: 18px; border: 3px solid #d5dbe3; border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .statusline { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; color: var(--primary-dark); }
+  .hidden { display: none !important; }
+  .kv { font-size: 13px; margin-bottom: 4px; }
+  .kv b { color: var(--primary-dark); }
+  .draft-pre { background: #fbfcfd; border: 1px solid var(--border); border-radius: 6px; padding: 16px; font-family: 'Consolas', monospace; font-size: 12.5px; white-space: pre-wrap; max-height: 600px; overflow: auto; line-height: 1.5; }
+  .callout { border-left: 4px solid var(--primary); background: #eef4fb; padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 13px; margin: 10px 0; }
+  .callout.warn { border-color: var(--warn); background: #fef9ec; }
+  .callout.danger { border-color: var(--danger); background: #fdecea; }
+  .sidebar-layout { display: grid; grid-template-columns: 260px 1fr; gap: 18px; }
+  .client-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; cursor: pointer; background: #fff; }
+  .client-item:hover { border-color: var(--primary); }
+  .client-item.selected { border-color: var(--primary); background: #eef4fb; }
+  .client-item .name { font-weight: 600; font-size: 13px; }
+  .client-item .meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .tabs-min { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs-min button { padding: 6px 14px; border: 1px solid var(--border); background: #fff; border-radius: 16px; cursor: pointer; font-size: 12.5px; color: var(--text); }
+  .tabs-min button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .error-box { background: #fdecea; color: var(--danger); border: 1px solid #f5b7b1; border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 13px; }
+  .footnote { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>TaxDraft MY</h1>
+    <div class="sub">Malaysian corporate tax — first-draft computation &amp; variance review</div>
+  </div>
+  <div class="spacer"></div>
+  <div id="llmStatus" class="sub"></div>
+</header>
+<nav class="tabs">
+  <button data-tab="clients" class="active">Clients</button>
+  <button data-tab="documents">Documents</button>
+  <button data-tab="analysis">Draft &amp; Variance</button>
+  <button data-tab="settings">Settings</button>
+</nav>
+<main>
+
+<!-- ===================== CLIENTS ===================== -->
+<section id="tab-clients">
+  <div class="sidebar-layout">
+    <div class="card">
+      <h2>Clients</h2>
+      <div id="clientList"></div>
+      <hr style="margin:14px 0;border:none;border-top:1px solid var(--border)">
+      <h3>New client</h3>
+      <label class="field"><span>Company name</span><input type="text" id="newClientName" placeholder="ABC Sdn Bhd"></label>
+      <label class="field"><span>Year of assessment (YA)</span><input type="text" id="newClientYa" placeholder="e.g. 2025"></label>
+      <button class="btn" id="addClientBtn">Add client</button>
+    </div>
+    <div class="card" id="clientDetail">
+      <div class="empty">Select a client from the list, or create a new one.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DOCUMENTS ===================== -->
+<section id="tab-documents" class="hidden">
+  <div class="card">
+    <h2>Upload documents — <span id="docClientName" style="color:var(--danger)"></span></h2>
+    <p class="footnote" style="margin-bottom:14px">Upload each document under its correct category. Supported: .xlsx, .xls, .csv, .pdf</p>
+    <div class="row">
+      <div>
+        <h3>Last year's tax computation</h3>
+        <div class="dropzone" data-cat="prior_tc">Drop file or click to browse</div>
+        <ul class="filelist" data-catlist="prior_tc"></ul>
+      </div>
+      <div>
+        <h3>Last year's financial statements</h3>
+        <div class="dropzone" data-cat="prior_fs">Drop file or click to browse</div>
+        <ul class="filelist" data-catlist="prior_fs"></ul>
+      </div>
+      <div>
+        <h3>This year's financial statements / trial balance</h3>
+        <div class="dropzone" data-cat="current_fs">Drop file or click to browse</div>
+        <ul class="filelist" data-catlist="current_fs"></ul>
+      </div>
+    </div>
+    <input type="file" id="fileInput" multiple class="hidden" accept=".xlsx,.xls,.csv,.pdf">
+    <div id="parseStatus" class="statusline hidden"><span class="spinner"></span><span id="parseStatusText">Parsing…</span></div>
+    <div id="parseError" class="error-box hidden"></div>
+    <h3 style="margin-top:16px">Extracted content</h3>
+    <div id="extractedView" class="empty">No documents parsed yet.</div>
+  </div>
+</section>
+
+<!-- ===================== ANALYSIS ===================== -->
+<section id="tab-analysis" class="hidden">
+  <div class="card">
+    <h2>Generate draft — <span id="anClientName" style="color:var(--danger)"></span></h2>
+    <div id="anReadyCheck"></div>
+    <label class="field" style="margin-top:10px"><span>Extra instructions for the AI (optional) — e.g. known adjustments, group relief, changes in accounting policy</span>
+      <textarea id="extraInstructions" rows="3" placeholder="e.g. Client has unabsorbed business losses from YA2022 of RM150,000"></textarea></label>
+    <div class="row" style="margin-top:6px">
+      <div style="flex:0 0 auto; min-width:auto">
+        <button class="btn accent" id="generateBtn">Generate draft computation + variance report</button>
+        <button class="btn secondary" id="exportXlsxBtn" disabled>Export draft to Excel</button>
+      </div>
+    </div>
+    <div id="genStatus" class="statusline hidden"><span class="spinner"></span><span id="genStatusText">Working…</span></div>
+    <div id="genError" class="error-box hidden"></div>
+  </div>
+  <div id="resultsArea"></div>
+</section>
+
+<!-- ===================== SETTINGS ===================== -->
+<section id="tab-settings" class="hidden">
+  <div class="card">
+    <h2>AI settings</h2>
+    <p class="footnote" style="margin-bottom:14px">The AI is called through the configured API endpoint. The API key is stored only in this browser. Client financial data is sent to the LLM endpoint only when you click "Generate".</p>
+    <div class="row">
+      <div><label class="field"><span>API base URL</span><input type="text" id="setBaseUrl"></label></div>
+      <div><label class="field"><span>Model</span><input type="text" id="setModel"></label></div>
+    </div>
+    <label class="field"><span>API key</span><input type="password" id="setApiKey" placeholder="Paste API key"></label>
+    <button class="btn" id="saveSettingsBtn">Save settings</button>
+    <button class="btn secondary" id="testLlmBtn">Test connection</button>
+    <div id="settingsMsg" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <h2>Data &amp; privacy</h2>
+    <p class="footnote">All client data is stored in this browser's local storage on this machine only. To wipe everything, click below.</p>
+    <button class="btn" style="background:var(--danger); margin-top:10px" id="wipeBtn">Erase all stored data</button>
+  </div>
+</section>
+</main>
+
+<script>
+/* ============================================================
+   TaxDraft MY — single-file app
+   Storage: localStorage per client. LLM: OpenAI-compatible API.
+   ============================================================ */
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const LS_KEY = 'taxdraftmy_v1';
+let state = { clients: [], selectedId: null, settings: { baseUrl: 'http://localhost:8765', model: 'ilmu-glm-5.3-flash', apiKey: '' } };
+
+function load() {
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) { const d = JSON.parse(raw); state.clients = d.clients || []; state.settings = Object.assign(state.settings, d.settings); } } catch(e) { console.warn(e); }
+}
+function save() { localStorage.setItem(LS_KEY, JSON.stringify({ clients: state.clients, settings: state.settings })); }
+function current() { return state.clients.find(c => c.id === state.selectedId) || null; }
+function uid() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function fmtRM(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+load();
+updateLlmStatus();
+
+/* ---------------- Tabs ---------------- */
+document.querySelectorAll('nav.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav.tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  ['clients','documents','analysis','settings'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+  if (b.dataset.tab === 'documents') renderDocuments();
+  if (b.dataset.tab === 'analysis') renderAnalysis();
+  if (b.dataset.tab === 'settings') renderSettings();
+}));
+function gotoTab(t) { document.querySelector(`nav.tabs button[data-tab="${t}"]`).click(); }
+
+/* ---------------- Clients ---------------- */
+document.getElementById('addClientBtn').addEventListener('click', () => {
+  const name = document.getElementById('newClientName').value.trim();
+  const ya = document.getElementById('newClientYa').value.trim();
+  if (!name) { alert('Enter a company name.'); return; }
+  const c = { id: uid(), name, ya: ya || (new Date().getFullYear() + 1), docs: [], results: null };
+  state.clients.push(c); state.selectedId = c.id; save();
+  document.getElementById('newClientName').value = ''; document.getElementById('newClientYa').value = '';
+  renderClients();
+});
+function renderClients() {
+  const el = document.getElementById('clientList'); el.innerHTML = '';
+  if (!state.clients.length) { el.innerHTML = '<div class="empty" style="padding:16px">No clients yet.</div>'; return; }
+  state.clients.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'client-item' + (c.id === state.selectedId ? ' selected' : '');
+    div.innerHTML = `<div class="name">${escapeHtml(c.name)}</div><div class="meta">YA ${escapeHtml(c.ya)} · ${docCounts(c)}</div>`;
+    div.addEventListener('click', () => { state.selectedId = c.id; save(); renderClients(); });
+    el.appendChild(div);
+  });
+}
+function docCounts(c) {
+  const n = k => c.docs.filter(d => d.cat === k).length;
+  return `TC:${n('prior_tc')} PY-FS:${n('prior_fs')} CY-FS:${n('current_fs')}`;
+}
+function renderClientDetail() {
+  const c = current(); const el = document.getElementById('clientDetail');
+  if (!c) { el.innerHTML = '<div class="empty">Select a client from the list, or create a new one.</div>'; return; }
+  el.innerHTML = `
+    <h2>${escapeHtml(c.name)} <span class="badge grey">YA ${escapeHtml(c.ya)}</span></h2>
+    <div class="row" style="margin:10px 0">
+      <div class="kv"><b>Documents:</b> ${docCounts(c)}</div>
+      <div class="kv"><b>Last run:</b> ${c.results ? new Date(c.results.generatedAt).toLocaleString() : 'never'}</div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <button class="btn" onclick="gotoTab('documents')">Manage documents</button>
+      <button class="btn accent" onclick="gotoTab('analysis')">Draft &amp; variance</button>
+      <button class="btn" style="background:var(--danger)" onclick="deleteClient('${c.id}')">Delete client</button>
+    </div>`;
+}
+window.deleteClient = function(id) {
+  const c = state.clients.find(x => x.id === id);
+  if (!c || !confirm(`Delete "${c.name}" and all its documents/results? This cannot be undone.`)) return;
+  state.clients = state.clients.filter(x => x.id !== id);
+  if (state.selectedId === id) state.selectedId = null;
+  save(); renderClients(); renderClientDetail();
+};
+
+/* ---------------- Document upload & parsing ---------------- */
+let pendingCat = null;
+document.querySelectorAll('.dropzone').forEach(dz => {
+  dz.addEventListener('click', () => { pendingCat = dz.dataset.cat; document.getElementById('fileInput').click(); });
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); handleFiles(e.dataTransfer.files, dz.dataset.cat); });
+});
+document.getElementById('fileInput').addEventListener('change', e => { handleFiles(e.target.files, pendingCat); e.target.value = ''; });
+
+function handleFiles(fileList, cat) {
+  const c = current();
+  if (!c) { alert('Select a client first (Clients tab).'); return; }
+  const statusEl = document.getElementById('parseStatus');
+  const statusTx = document.getElementById('parseStatusText');
+  const errEl = document.getElementById('parseError');
+  errEl.classList.add('hidden');
+  const files = [...fileList].filter(f => /\.(xlsx|xls|csv|pdf)$/i.test(f.name));
+  if (!files.length) { showError(errEl, 'Unsupported file type. Use .xlsx, .xls, .csv or .pdf.'); return; }
+  statusEl.classList.remove('hidden');
+  let i = 0;
+  const next = async () => {
+    if (i >= files.length) { statusEl.classList.add('hidden'); save(); renderDocuments(); return; }
+    const f = files[i++];
+    statusTx.textContent = `Parsing (${i}/${files.length}): ${f.name}`;
+    try {
+      const ext = f.name.split('.').pop().toLowerCase();
+      let parsed;
+      if (ext === 'pdf') parsed = await parsePdf(f);
+      else parsed = parseExcel(f);
+      c.docs.push({ id: uid(), cat, name: f.name, size: f.size, parsedAt: new Date().toISOString(), parsed });
+    } catch (err) { showError(errEl, `${f.name}: ${err.message}`); }
+    next();
+  };
+  next();
+}
+function showError(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+
+async function parsePdf(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let out = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    // group text items into lines by y position
+    const lines = {};
+    tc.items.forEach(it => {
+      const y = Math.round(it.transform[5]);
+      (lines[y] = lines[y] || []).push({ x: it.transform[4], s: it.str });
+    });
+    const sorted = Object.keys(lines).map(Number).sort((a,b) => b - a);
+    for (const y of sorted) {
+      const parts = lines[y].sort((a,b) => a.x - b.x).map(p => p.s).join(' ').replace(/\s+/g,' ').trim();
+      if (parts) out += parts + '\n';
+    }
+    out += `\n--- end of page ${p} ---\n`;
+  }
+  return { kind: 'pdf', pages: pdf.numPages, text: out.slice(0, 220000) };
+}
+
+function parseExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const sheets = wb.SheetNames.map(name => {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
+          return { name, rows: rows.map(r => r.map(v => v instanceof Date ? v.toISOString().slice(0,10) : v)) };
+        });
+        resolve({ kind: 'excel', sheets });
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function renderDocuments() {
+  const c = current();
+  const nameEl = document.getElementById('docClientName');
+  if (!c) { nameEl.textContent = '(no client selected)'; return; }
+  nameEl.textContent = `${c.name} — YA ${c.ya}`;
+  // file lists
+  document.querySelectorAll('[data-catlist]').forEach(ul => {
+    ul.innerHTML = '';
+    c.docs.filter(d => d.cat === ul.dataset.catlist).forEach(d => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="tag ${d.parsed.kind}">${d.parsed.kind}</span> ${escapeHtml(d.name)} <span class="remove" title="Remove">✕</span>`;
+      li.querySelector('.remove').addEventListener('click', () => { c.docs = c.docs.filter(x => x.id !== d.id); save(); renderDocuments(); });
+      ul.appendChild(li);
+    });
+  });
+  // extracted view
+  const ex = document.getElementById('extractedView');
+  if (!c.docs.length) { ex.innerHTML = '<div class="empty">No documents parsed yet.</div>'; return; }
+  const tabs = document.createElement('div');
+  tabs.className = 'tabs-min';
+  const pre = document.createElement('pre');
+  pre.className = 'draft-pre'; pre.style.maxHeight = '480px';
+  const showDoc = d => {
+    tabs.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.id === d.id));
+    pre.textContent = d.parsed.kind === 'pdf' ? d.parsed.text : excelToText(d.parsed);
+  };
+  c.docs.forEach(d => {
+    const b = document.createElement('button');
+    b.dataset.id = d.id;
+    b.textContent = `[${catLabel(d.cat)}] ${d.name}`;
+    b.addEventListener('click', () => showDoc(d));
+    tabs.appendChild(b);
+  });
+  ex.innerHTML = ''; ex.appendChild(tabs); ex.appendChild(pre);
+  showDoc(c.docs[0]);
+}
+function catLabel(cat) { return { prior_tc: 'PY TC', prior_fs: 'PY FS', current_fs: 'CY FS' }[cat] || cat; }
+function excelToText(p) {
+  return p.sheets.map(s => `=== Sheet: ${s.name} ===\n` + s.rows.map(r => r.map(v => v === null ? '' : String(v)).join(' | ')).join('\n')).join('\n\n');
+}
+
+/* ---------------- Analysis / AI ---------------- */
+function renderAnalysis() {
+  const c = current();
+  const nameEl = document.getElementById('anClientName');
+  const chk = document.getElementById('anReadyCheck');
+  const btn = document.getElementById('generateBtn');
+  if (!c) { nameEl.textContent = '(no client selected)'; chk.innerHTML = '<div class="callout warn">Select a client in the Clients tab first.</div>'; btn.disabled = true; return; }
+  nameEl.textContent = `${c.name} — YA ${c.ya}`;
+  const has = k => c.docs.some(d => d.cat === k);
+  const ready = has('prior_tc') && has('prior_fs') && has('current_fs');
+  chk.innerHTML = `
+    <span class="badge ${has('prior_tc') ? 'green' : 'red'}">Prior-year tax computation</span>
+    <span class="badge ${has('prior_fs') ? 'green' : 'red'}">Prior-year financials</span>
+    <span class="badge ${has('current_fs') ? 'green' : 'red'}">Current-year financials</span>
+    ${ready ? '' : '<div class="callout warn">Upload all three document categories before generating a draft.</div>'}`;
+  btn.disabled = !ready;
+  if (c.results) renderResults(c.results);
+  else document.getElementById('resultsArea').innerHTML = '';
+}
+
+document.getElementById('generateBtn').addEventListener('click', async () => {
+  const c = current(); if (!c) return;
+  const st = document.getElementById('genStatus'), stx = document.getElementById('genStatusText'), err = document.getElementById('genError');
+  err.classList.add('hidden'); st.classList.remove('hidden');
+  btn.disabled = true;
+  try {
+    stx.textContent = 'Building context from documents…';
+    const payload = buildPrompt(c);
+    stx.textContent = 'Calling AI — this can take a minute or two…';
+    const raw = await callLlm(payload);
+    stx.textContent = 'Formatting results…';
+    const results = interpretResponse(raw);
+    results.generatedAt = new Date().toISOString();
+    results.model = state.settings.model;
+    c.results = results; save();
+    renderResults(results);
+  } catch (e) { showError(err, 'AI call failed: ' + e.message); }
+  st.classList.add('hidden');
+  document.getElementById('generateBtn').disabled = false;
+});
+
+function buildPrompt(c) {
+  const docText = cat => c.docs.filter(d => d.cat === cat).map(d =>
+    `\n### [${catLabel(cat)}] ${d.name}\n` + (d.parsed.kind === 'pdf' ? d.parsed.text : excelToText(d.parsed))
+  ).join('\n');
+  return `You are a Malaysian tax professional drafting a corporate tax computation. Respond ONLY with a JSON object (no markdown fences) with these keys:
+- "draft_tc": a plain-text, formatted tax computation for the current year of assessment (${c.ya}), following the structure and presentation style of the prior-year computation provided. Show workings where the prior year did. Use Malaysian corporate tax rules for a resident company: YA2023 rates 15% (first RM150,000), 17% (RM150,001–600,000), 24% thereafter; MSME/concessionary regime for paid-up capital ≤ RM2.5m and gross income ≤ RM50m: 0% first RM150,000, 15% RM150,001–600,000, 17% RM600,001–2,000,000 (applies YA2021–YA2023; for YA2024 onwards the standard SME rates are 15% first RM150,000, 17% RM150,001–600,000, 24% above, subject to conditions — pick the correct regime based on the facts given and state your assumption). Include: net profit per accounts, add-backs (depreciation, entertainment in excess of allowable, Donations non-approved, etc.), deductions (allowed donations, capital allowances with workings), interest restriction s.133, non-trade receipts, tax adjustments and estimated chargeable income, residual tax. Flag every figure that could not be traced to the documents with "[ASSUMPTION]".
+- "variances": array of objects {"area", "prior", "current", "change_pct", "severity": "high|medium|low|info", "commentary"} comparing prior-year vs current-year financials: items with >15% movement, new/removed line items, margin shifts, unusual balances, and Malaysian tax-risk flags (e.g. s.33(1) general deduction, s.39 disallowables, entertainment, cash payments >RM20k s.33(1)(a) proviso? (note: payments >RM20k to agents/dealers/distributors), interest restriction s.133, related-party balances, provision for ECL movements, single-tier dividend income, etc.)
+- "investigations": array of {"question", "why", "severity"} — specific items for the tax professional to investigate before finalising.
+- "notes": array of strings — assumptions, data gaps, and caveats.
+All amounts in RM unless stated otherwise. Be conservative: never invent numbers without marking [ASSUMPTION].
+
+PRIOR-YEAR TAX COMPUTATION:
+${docText('prior_tc')}
+
+PRIOR-YEAR FINANCIAL STATEMENTS:
+${docText('prior_fs')}
+
+CURRENT-YEAR FINANCIAL STATEMENTS:
+${docText('current_fs')}
+
+CLIENT: ${c.name}, Year of Assessment: ${c.ya}.
+EXTRA INSTRUCTIONS: ${document.getElementById('extraInstructions').value.trim() || 'none'}`;
+}
+
+const DEFAULT_API_KEY = 'sk-b0942d7dac4ee9e393ce0b1beea8c50e91fbcd4da5247fed';
+
+async function callLlm(prompt) {
+  const s = state.settings;
+  if (!s.baseUrl) throw new Error('Set the API base URL in Settings.');
+  const res = await fetch(s.baseUrl.replace(/\/+$/,'') + '/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.apiKey || DEFAULT_API_KEY) },
+    body: JSON.stringify({ model: s.model, messages: [{ role: 'user', content: prompt }], temperature: 0.2 })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+function interpretResponse(raw) {
+  let txt = raw.trim();
+  const m = txt.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (m) txt = m[1].trim();
+  const start = txt.indexOf('{');
+  const end = txt.lastIndexOf('}');
+  if (start > 0) txt = txt.slice(start, end + 1);
+  let obj;
+  try { obj = JSON.parse(txt); }
+  catch { return { draft_tc: raw, variances: [], investigations: [], notes: ['AI response was not valid JSON — showing raw text.'], rawText: true }; }
+  return {
+    draft_tc: obj.draft_tc || '',
+    variances: obj.variances || [],
+    investigations: obj.investigations || [],
+    notes: obj.notes || []
+  };
+}
+
+/* ---------------- Results rendering ---------------- */
+function renderResults(r) {
+  const area = document.getElementById('resultsArea');
+  const sevBadge = s => `<span class="badge ${{high:'red', medium:'orange', low:'green', info:'grey'}[s] || 'grey'}">${escapeHtml(s)}</span>`;
+  area.innerHTML = `
+  <div class="card">
+    <h2>Draft tax computation</h2>
+    <div class="callout warn">First draft prepared by AI. Every figure must be reviewed, traced to source documents, and approved by a qualified tax professional before filing. Assumptions are marked [ASSUMPTION].</div>
+    <pre class="draft-pre">${escapeHtml(r.draft_tc || '(empty)')}</pre>
+    <div class="footnote">Generated ${new Date(r.generatedAt).toLocaleString()} · model ${escapeHtml(r.model || '')}</div>
+  </div>
+  <div class="card">
+    <h2>Variances — prior year vs current year</h2>
+    ${r.variances.length ? `<div class="scrollbox"><table class="data"><thead><tr><th>Area</th><th>Prior (RM)</th><th>Current (RM)</th><th>Change</th><th>Severity</th><th>Commentary</th></tr></thead><tbody>
+      ${r.variances.map(v => `<tr><td>${escapeHtml(v.area)}</td><td class="num">${escapeHtml(String(v.prior ?? '—'))}</td><td class="num">${escapeHtml(String(v.current ?? '—'))}</td><td class="num">${escapeHtml(String(v.change_pct ?? '—'))}</td><td>${sevBadge(v.severity)}</td><td>${escapeHtml(v.commentary || '')}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">No variances reported.</div>'}
+  </div>
+  <div class="card">
+    <h2>Items for investigation</h2>
+    ${r.investigations.length ? `<div class="scrollbox"><table class="data"><thead><tr><th style="width:40%">Question</th><th>Why it matters</th><th>Severity</th></tr></thead><tbody>
+      ${r.investigations.map(i => `<tr><td>${escapeHtml(i.question)}</td><td>${escapeHtml(i.why)}</td><td>${sevBadge(i.severity)}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">None reported.</div>'}
+  </div>
+  <div class="card">
+    <h2>Assumptions &amp; caveats</h2>
+    <ul style="margin-left:18px; font-size:13px; line-height:1.7">${r.notes.map(n => `<li>${escapeHtml(n)}</li>`).join('') || '<li>None.</li>'}</ul>
+  </div>`;
+  document.getElementById('exportXlsxBtn').disabled = false;
+}
+
+document.getElementById('exportXlsxBtn').addEventListener('click', () => {
+  const c = current(); if (!c || !c.results) return;
+  const r = c.results;
+  const wb = XLSX.utils.book_new();
+  const tc = XLSX.utils.aoa_to_sheet(r.draft_tc.split('\n').map(l => [l]));
+  XLSX.utils.book_append_sheet(wb, tc, 'Draft TC');
+  const vRows = [['Area','Prior (RM)','Current (RM)','Change','Severity','Commentary'], ...r.variances.map(v => [v.area, v.prior, v.current, v.change_pct, v.severity, v.commentary])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(vRows), 'Variances');
+  const iRows = [['Question','Why','Severity'], ...r.investigations.map(i => [i.question, i.why, i.severity])];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(iRows), 'Investigations');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Assumptions & caveats'], ...r.notes.map(n => [n])]), 'Notes');
+  XLSX.writeFile(wb, `${c.name.replace(/[^\w\- ]+/g,'')}_YA${c.ya}_draft_TC.xlsx`);
+});
+
+/* ---------------- Settings ---------------- */
+function renderSettings() {
+  document.getElementById('setBaseUrl').value = state.settings.baseUrl;
+  document.getElementById('setModel').value = state.settings.model;
+  document.getElementById('setApiKey').value = state.settings.apiKey;
+}
+document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+  state.settings.baseUrl = document.getElementById('setBaseUrl').value.trim();
+  state.settings.model = document.getElementById('setModel').value.trim();
+  state.settings.apiKey = document.getElementById('setApiKey').value.trim();
+  save(); updateLlmStatus();
+  document.getElementById('settingsMsg').innerHTML = '<span class="badge green">Saved</span>';
+});
+document.getElementById('testLlmBtn').addEventListener('click', async () => {
+  const msg = document.getElementById('settingsMsg');
+  msg.innerHTML = '<span class="spinner"></span> Testing…';
+  try { const r = await callLlm('Reply with exactly: OK'); msg.innerHTML = '<span class="badge green">Connection OK — AI replied: ' + escapeHtml(r.slice(0, 40)) + '</span>'; }
+  catch (e) { msg.innerHTML = '<span class="badge red">Failed: ' + escapeHtml(e.message) + '</span>'; }
+});
+document.getElementById('wipeBtn').addEventListener('click', () => {
+  if (confirm('Erase ALL clients, documents and results from this browser? This cannot be undone.')) { localStorage.removeItem(LS_KEY); location.reload(); }
+});
+function updateLlmStatus() {
+  const s = state.settings;
+  document.getElementById('llmStatus').textContent = `AI: ${s.model || 'model not set'}${s.apiKey ? '' : ' (built-in key)'}`;
+}
+
+/* ---------------- util ---------------- */
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+renderClients(); renderClientDetail();
+</script>
+</body>
+</html>
